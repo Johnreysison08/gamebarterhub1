@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages — GameBarterHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/notification.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/messages.css">
+</head>
+<body>
+
+<!-- Navbar injected by navbar-template.js -->
+
+<div class="messages-layout">
+  <!-- Sidebar -->
+  <div class="msg-sidebar">
+    <div class="msg-sidebar-header">💬 Messages</div>
+    <div class="msg-search">
+      <input class="form-input" placeholder="Search conversations..."
+        style="border-radius:20px;font-size:0.82rem;padding:8px 14px"
+        oninput="filterContacts(this.value)">
+    </div>
+    <div class="msg-list" id="msgList"></div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area" id="chatArea">
+    <div class="chat-empty">
+      <div class="chat-empty-icon">💬</div>
+      <p>Select a conversation to start chatting</p>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/notification.js"></script>
+<script src="js/navbar-template.js"></script>
+<script>
+  if (!state.currentUser) window.location.href = 'login.html';
+
+  let currentConvoKey = null;
+
+  // ── GET ALL CONVOS FOR CURRENT USER ──
+  function getMyConvos() {
+    const myEmail = state.currentUser.email;
+    return Object.entries(state.convos)
+      .filter(([key, c]) => c.participants.includes(myEmail))
+      .map(([key, c]) => {
+        const otherEmail = c.participants.find(e => e !== myEmail);
+        const otherUser  = state.users.find(u => u.email === otherEmail);
+        const otherName  = otherUser ? otherUser.name : (otherEmail || 'Unknown');
+        return { key, convo: c, otherEmail, otherName };
+      })
+      .filter(c => c.otherName);
+  }
+
+  // ── RENDER CONTACT LIST ──
+  function renderContacts(filter = '') {
+    const convos = getMyConvos()
+      .filter(c => !filter || c.otherName.toLowerCase().includes(filter.toLowerCase()));
+
+    // Count unread per convo (messages from other that I haven't read)
+    document.getElementById('msgList').innerHTML = convos.length
+      ? convos.map(({ key, convo, otherEmail, otherName }) => {
+          const last = convo.messages[convo.messages.length - 1];
+          const unread = (convo.unreadFor || {})[state.currentUser.email] || 0;
+          return `
+          <div class="msg-contact ${currentConvoKey === key ? 'active' : ''}" onclick="openChat('${key}')">
+            <div class="mini-avatar" style="width:38px;height:38px;flex-shrink:0">
+              ${getAvatarEl(otherName)}
+            </div>
+            <div class="msg-contact-info">
+              <div class="msg-contact-name">${otherName}</div>
+              <div class="msg-contact-preview">${last ? last.text : 'No messages yet'}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <span class="msg-contact-time">${last ? last.time : ''}</span>
+              ${unread ? `<span class="msg-unread">${unread}</span>` : ''}
+            </div>
+          </div>`;
+        }).join('')
+      : `<div class="empty-state"><div class="empty-state-icon">💬</div><p>No conversations yet.</p></div>`;
+  }
+
+  function filterContacts(q) { renderContacts(q); }
+
+  // ── OPEN CHAT ──
+  function openChat(key) {
+    currentConvoKey = key;
+    const convo = state.convos[key];
+    if (!convo) return;
+
+    const myEmail    = state.currentUser.email;
+    const otherEmail = convo.participants.find(e => e !== myEmail);
+    const otherUser  = state.users.find(u => u.email === otherEmail);
+    const otherName  = otherUser ? otherUser.name : otherEmail;
+
+    // Mark unread as read
+    if (!convo.unreadFor) convo.unreadFor = {};
+    convo.unreadFor[myEmail] = 0;
+    save();
+
+    document.getElementById('chatArea').innerHTML = `
+      <div class="chat-header">
+        <div class="mini-avatar" style="width:36px;height:36px">${getAvatarEl(otherName)}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:0.9rem">${otherName}</div>
+          <div style="font-size:0.72rem;color:var(--accent-green)">● Active</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button onclick="startVoiceCall('${otherName}')" title="Voice Call" style="
+            width:38px;height:38px;border-radius:50%;border:1px solid rgba(0,229,255,0.35);
+            background:rgba(0,229,255,0.08);color:var(--accent-cyan);
+            cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;">📞</button>
+          <button onclick="startVideoCall('${otherName}')" title="Video Call" style="
+            width:38px;height:38px;border-radius:50%;border:1px solid rgba(57,255,20,0.35);
+            background:rgba(57,255,20,0.08);color:var(--accent-green);
+            cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;">📹</button>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMsgs">
+        ${convo.messages.map(m => {
+          const isMine = m.fromEmail === myEmail || m.from === state.currentUser.name;
+          return `
+          <div class="chat-msg ${isMine ? 'sent' : 'received'}">
+            ${!isMine ? `<div class="mini-avatar" style="flex-shrink:0">${getAvatarEl(m.from)}</div>` : ''}
+            <div>
+              <div class="chat-bubble">${m.text}</div>
+              <div class="chat-msg-time">${m.time}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="chat-input-area">
+        <textarea class="chat-input" id="chatInputEl" placeholder="Type a message..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}">
+        </textarea>
+        <button class="chat-send" onclick="sendMsg()">➤</button>
+      </div>`;
+
+    scrollBottom();
+    renderContacts();
+  }
+
+  // ── SEND MESSAGE ── writes to shared convo so both users see it
+  function sendMsg() {
+    const u       = state.currentUser;
+    const inputEl = document.getElementById('chatInputEl');
+    const text    = inputEl.value.trim();
+    if (!text || !currentConvoKey) return;
+
+    const convo = state.convos[currentConvoKey];
+    if (!convo) return;
+
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msg  = { from: u.name, fromEmail: u.email, text, time };
+    convo.messages.push(msg);
+
+    // Mark unread for the OTHER participant
+    const otherEmail = convo.participants.find(e => e !== u.email);
+    if (!convo.unreadFor) convo.unreadFor = {};
+    convo.unreadFor[otherEmail] = (convo.unreadFor[otherEmail] || 0) + 1;
+
+    save();
+    inputEl.value = '';
+
+    const msgsEl = document.getElementById('chatMsgs');
+    const div    = document.createElement('div');
+    div.className = 'chat-msg sent';
+    div.innerHTML = `<div><div class="chat-bubble">${text}</div><div class="chat-msg-time">${time}</div></div>`;
+    msgsEl.appendChild(div);
+    scrollBottom();
+    renderContacts();
+  }
+
+  function scrollBottom() {
+    const el = document.getElementById('chatMsgs');
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  // ── CALL MODAL ──
+  function startVoiceCall(contact) { showCallModal(contact, false); }
+  function startVideoCall(contact) { showCallModal(contact, true); }
+
+  function showCallModal(contact, isVideo) {
+    const existing = document.getElementById('callModal');
+    if (existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'callModal';
+    modal.style.cssText = `position:fixed;inset:0;background:rgba(5,5,20,0.92);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:9999;`;
+    const callType = isVideo ? 'Video Call' : 'Voice Call';
+    const callIcon = isVideo ? '📹' : '📞';
+    modal.innerHTML = `
+      <div style="background:linear-gradient(135deg,#0d1117,#0a1628);border:1px solid rgba(0,229,255,0.2);border-radius:24px;padding:48px 40px;text-align:center;min-width:280px;max-width:340px;width:90%;box-shadow:0 0 60px rgba(0,229,255,0.1);animation:callPulse 0.3s ease;">
+        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(0,229,255,0.2),rgba(57,255,20,0.1));border:2px solid rgba(0,229,255,0.4);display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 16px;">${getAvatarEl(contact)}</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;margin-bottom:4px;color:#fff">${contact}</div>
+        <div style="font-size:0.82rem;color:var(--accent-cyan);margin-bottom:8px">${callIcon} ${callType}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:32px" id="callStatus">Calling...</div>
+        <button onclick="endCall()" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ff3b3b,#cc0000);border:none;color:#fff;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 20px rgba(255,59,59,0.4);">📵</button>
+      </div>
+      <style>@keyframes callPulse { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }</style>`;
+    document.body.appendChild(modal);
+    setTimeout(() => { const s=document.getElementById('callStatus'); if(s) s.textContent='Ringing...'; }, 800);
+    setTimeout(() => { const s=document.getElementById('callStatus'); if(s){s.textContent='Connected ● 00:00';s.style.color='var(--accent-green)';startCallTimer();} }, 2500);
+  }
+
+  let _callTimer=null, _callSeconds=0;
+  function startCallTimer() {
+    _callSeconds=0;
+    _callTimer=setInterval(()=>{
+      _callSeconds++;
+      const m=String(Math.floor(_callSeconds/60)).padStart(2,'0');
+      const s=String(_callSeconds%60).padStart(2,'0');
+      const el=document.getElementById('callStatus');
+      if(el) el.textContent=`Connected ● ${m}:${s}`;
+    },1000);
+  }
+  function endCall() {
+    clearInterval(_callTimer);
+    const modal=document.getElementById('callModal');
+    if(modal){modal.style.opacity='0';modal.style.transition='opacity 0.2s';setTimeout(()=>modal.remove(),200);}
+  }
+
+  // ── INIT ──
+  renderContacts();
+
+  // Auto-open chat if coming from "Contact" button
+  const openWith = localStorage.getItem('ta_openChat');
+  if (openWith) {
+    localStorage.removeItem('ta_openChat');
+    const key = convoKey(state.currentUser.email, openWith);
+    if (state.convos[key]) openChat(key);
+  }
+
+  // Auto-refresh every 2s to show incoming messages
+  setInterval(() => {
+    // Reload state from localStorage to pick up messages sent by other sessions
+    const freshConvos = JSON.parse(localStorage.getItem('ta_convos') || '{}');
+    state.convos = freshConvos;
+    renderContacts();
+    // If a chat is open, refresh it too
+    if (currentConvoKey && document.getElementById('chatMsgs')) {
+      const convo = state.convos[currentConvoKey];
+      if (!convo) return;
+      const myEmail    = state.currentUser.email;
+      const otherEmail = convo.participants.find(e => e !== myEmail);
+      const otherUser  = state.users.find(u => u.email === otherEmail);
+      const otherName  = otherUser ? otherUser.name : otherEmail;
+      const msgsEl     = document.getElementById('chatMsgs');
+      const prevCount  = msgsEl ? msgsEl.querySelectorAll('.chat-msg').length : 0;
+      if (convo.messages.length !== prevCount) {
+        msgsEl.innerHTML = convo.messages.map(m => {
+          const isMine = m.fromEmail === myEmail || m.from === state.currentUser.name;
+          return `
+          <div class="chat-msg ${isMine ? 'sent' : 'received'}">
+            ${!isMine ? `<div class="mini-avatar" style="flex-shrink:0">${getAvatarEl(m.from)}</div>` : ''}
+            <div><div class="chat-bubble">${m.text}</div><div class="chat-msg-time">${m.time}</div></div>
+          </div>`;
+        }).join('');
+        // Mark read
+        if (!convo.unreadFor) convo.unreadFor = {};
+        convo.unreadFor[myEmail] = 0;
+        save();
+        scrollBottom();
+      }
+    }
+  }, 2000);
+</script>
+</body>
+</html>

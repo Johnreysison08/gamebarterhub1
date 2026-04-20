@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — GameBarterHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/notification.css">
+  <link rel="stylesheet" href="css/forms.css">
+</head>
+<body>
+
+<!-- Navbar injected by navbar-template.js -->
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <a class="auth-logo" href="index.html">GAME<span>BARTERHUB</span></a>
+    <div class="auth-title">Welcome Back</div>
+    <div class="auth-sub">Sign in to continue trading</div>
+
+    <div class="error-msg" id="loginError"></div>
+
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <input class="form-input" id="loginEmail" placeholder="you@example.com" type="email">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="loginPass" placeholder="Your password" type="password"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+
+    <button class="btn btn-primary full-btn" onclick="doLogin()" style="margin-top:8px;padding:12px">
+      Sign In
+    </button>
+
+    <div style="text-align:center;margin-top:10px">
+      <a href="#" onclick="openForgotModal();return false;" style="color:var(--accent-cyan);font-size:0.82rem;text-decoration:none;">Forgot password?</a>
+    </div>
+
+    <div style="text-align:center;margin-top:8px">
+      <small style="color:var(--text-muted)">Demo: register an account first, then log in</small>
+    </div>
+
+    <div class="auth-switch">
+      Don't have an account? <a href="register.html">Sign up free</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FORGOT PASSWORD MODAL ═══ -->
+<div id="forgotOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:28px 24px;width:100%;max-width:400px;margin:0 16px;box-shadow:0 8px 40px rgba(0,0,0,0.5)">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:4px">🔑 Reset Password</div>
+
+    <!-- Step 1: Enter Gmail -->
+    <div id="fgStep1">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px">Enter the Gmail address linked to your account. A verification code will be sent to that address.</p>
+      <div class="error-msg" id="fgError1"></div>
+      <div class="form-group">
+        <label class="form-label">Gmail Address</label>
+        <input class="form-input" id="fgEmail" type="email" placeholder="you@gmail.com"
+          onkeydown="if(event.key==='Enter') sendResetCode()">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeForgotModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="sendResetCode()" style="flex:2;padding:11px">Send Code</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Enter Code -->
+    <div id="fgStep2" style="display:none">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:4px">A 6-digit code was sent to <b id="fgEmailDisplay"></b>.</p>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:16px;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:8px 10px">
+        📬 <b>Demo note:</b> Since this is a local app, your code is shown here → <b id="fgCodeHint" style="color:var(--accent-cyan)"></b>
+      </p>
+      <div class="error-msg" id="fgError2"></div>
+      <div class="form-group">
+        <label class="form-label">Verification Code</label>
+        <input class="form-input" id="fgCode" type="text" placeholder="6-digit code" maxlength="6"
+          onkeydown="if(event.key==='Enter') verifyResetCode()">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeForgotModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="verifyResetCode()" style="flex:2;padding:11px">Verify Code</button>
+      </div>
+    </div>
+
+    <!-- Step 3: New Password -->
+    <div id="fgStep3" style="display:none">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px">Identity verified ✅ — Set a new password for your account.</p>
+      <div class="error-msg" id="fgError3"></div>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input class="form-input" id="fgNewPass" type="password" placeholder="Min. 6 characters">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input class="form-input" id="fgNewPass2" type="password" placeholder="Repeat password"
+          onkeydown="if(event.key==='Enter') doPasswordReset()">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="closeForgotModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="doPasswordReset()" style="flex:2;padding:11px">Reset Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/notification.js"></script>
+<script src="js/navbar-template.js"></script>
+<script>
+  // Redirect if already logged in
+  if (state.currentUser) window.location.href = 'index.html';
+
+  // ── FORGOT PASSWORD ──
+  let _fgCode = null;
+  let _fgUser = null;
+
+  function openForgotModal() {
+    _fgCode = null; _fgUser = null;
+    document.getElementById('fgEmail').value = '';
+    document.getElementById('fgCode').value = '';
+    document.getElementById('fgNewPass').value = '';
+    document.getElementById('fgNewPass2').value = '';
+    ['fgError1','fgError2','fgError3'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.display = 'none'; el.textContent = '';
+    });
+    document.getElementById('fgStep1').style.display = 'block';
+    document.getElementById('fgStep2').style.display = 'none';
+    document.getElementById('fgStep3').style.display = 'none';
+    const ov = document.getElementById('forgotOverlay');
+    ov.style.display = 'flex';
+  }
+
+  function closeForgotModal() {
+    document.getElementById('forgotOverlay').style.display = 'none';
+  }
+
+  function sendResetCode() {
+    const email = document.getElementById('fgEmail').value.trim().toLowerCase();
+    const err = document.getElementById('fgError1');
+    err.style.display = 'none';
+
+    if (!email) return showErr(err, 'Please enter your email address.');
+    if (!email.endsWith('@gmail.com')) return showErr(err, 'Only Gmail accounts (@gmail.com) are supported for password reset.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showErr(err, 'Invalid email address.');
+
+    const user = state.users.find(u => u.email === email);
+    if (!user) return showErr(err, 'No account found with this Gmail address.');
+
+    _fgUser = user;
+    _fgCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    document.getElementById('fgEmailDisplay').textContent = email;
+    document.getElementById('fgCodeHint').textContent = _fgCode;
+    document.getElementById('fgStep1').style.display = 'none';
+    document.getElementById('fgStep2').style.display = 'block';
+  }
+
+  function verifyResetCode() {
+    const entered = document.getElementById('fgCode').value.trim();
+    const err = document.getElementById('fgError2');
+    err.style.display = 'none';
+
+    if (!entered) return showErr(err, 'Please enter the verification code.');
+    if (entered !== _fgCode) return showErr(err, 'Incorrect code. Please check and try again.');
+
+    document.getElementById('fgStep2').style.display = 'none';
+    document.getElementById('fgStep3').style.display = 'block';
+  }
+
+  function doPasswordReset() {
+    const newPass  = document.getElementById('fgNewPass').value;
+    const newPass2 = document.getElementById('fgNewPass2').value;
+    const err = document.getElementById('fgError3');
+    err.style.display = 'none';
+
+    if (!newPass) return showErr(err, 'Please enter a new password.');
+    if (newPass.length < 6) return showErr(err, 'Password must be at least 6 characters.');
+    if (newPass !== newPass2) return showErr(err, 'Passwords do not match.');
+
+    // Update password in state
+    const userInState = state.users.find(u => u.email === _fgUser.email);
+    if (userInState) userInState.pass = newPass;
+    save();
+
+    closeForgotModal();
+    showToast('✅ Password reset! You can now sign in with your new password.');
+  }
+
+  // Close modal on overlay background click
+  document.getElementById('forgotOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeForgotModal();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile — GameBarterHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/notification.css">
+  <link rel="stylesheet" href="css/cards.css">
+  <link rel="stylesheet" href="css/profile.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <style>
+    .user-profile-not-found {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--text-muted);
+    }
+    .user-profile-not-found .nf-icon { font-size: 4rem; margin-bottom: 16px; }
+    .user-profile-not-found h2 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.8rem; font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .contact-btn-wrap {
+      margin-left: auto;
+      padding-bottom: 8px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      margin-bottom: 20px;
+      transition: color 0.2s;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .back-link:hover { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+
+<!-- Navbar injected by navbar-template.js -->
+
+<!-- ═══ TRADE DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Trade Details</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="profile-wrapper">
+
+  <a href="javascript:history.back()" class="back-link">← Back</a>
+
+  <div id="profileContent">
+    <!-- Filled by JS -->
+  </div>
+
+</div>
+
+<!-- Edit Trade Overlay placeholder (needed by trades.js) -->
+<div id="editTradeOverlay" class="modal-overlay" onclick="if(event.target===this)closeEditTradeModal()"></div>
+
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/navbar.js"></script>
+<script src="js/notification.js"></script>
+<script src="js/navbar-template.js"></script>
+<script src="js/trades.js"></script>
+<script>
+  // Get the target user email from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetEmail = urlParams.get('u');
+
+  function renderUserProfile() {
+    const content = document.getElementById('profileContent');
+
+    if (!targetEmail) {
+      content.innerHTML = `
+        <div class="user-profile-not-found">
+          <div class="nf-icon">🔍</div>
+          <h2>No user specified</h2>
+          <p>No user email was provided.</p>
+        </div>`;
+      return;
+    }
+
+    const user = state.users.find(u => u.email === targetEmail);
+
+    if (!user) {
+      content.innerHTML = `
+        <div class="user-profile-not-found">
+          <div class="nf-icon">👤</div>
+          <h2>User Not Found</h2>
+          <p>This user doesn't exist or may have been removed.</p>
+          <br>
+          <a href="browse.html" class="btn btn-ghost" style="font-size:0.82rem">Browse Trades</a>
+        </div>`;
+      return;
+    }
+
+    // If viewing own profile, redirect to profile.html
+    if (state.currentUser && state.currentUser.email === targetEmail) {
+      window.location.href = 'profile.html';
+      return;
+    }
+
+    const userTrades = state.trades.filter(t => t.userEmail === targetEmail);
+    const totalLikes = userTrades.reduce((s, t) => s + t.likes, 0);
+
+    // Check if this is a sample trade user (no registered account but trades exist)
+    const isGhost = !state.users.find(u => u.email === targetEmail);
+
+    const avatarEl = user.avatar
+      ? `<img src="${user.avatar}" alt="" style="width:100%;height:100%;object-fit:cover">`
+      : user.name[0].toUpperCase();
+
+    const contactBtn = state.currentUser && state.currentUser.email !== targetEmail
+      ? `<button class="btn btn-primary" style="font-size:0.82rem;padding:8px 18px"
+           onclick="goContact('${escapeHtml(user.name)}','${escapeHtml(targetEmail)}')">
+           💬 Message
+         </button>`
+      : (!state.currentUser
+          ? `<a href="login.html" class="btn btn-ghost" style="font-size:0.82rem;padding:8px 18px">
+               🔑 Login to Message
+             </a>`
+          : '');
+
+    // Member since
+    const joinDate = user.createdAt
+      ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+      : 'Unknown';
+
+    document.title = `${user.name} — GameBarterHub`;
+
+    content.innerHTML = `
+      <!-- Banner + Avatar + Info -->
+      <div class="profile-banner"></div>
+      <div class="profile-info">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="viewAvatarEl">${avatarEl}</div>
+          <div style="padding-bottom:8px">
+            <div class="profile-name">${escapeHtml(user.name)}</div>
+            ${user.loc  ? `<div class="profile-loc">📍 ${escapeHtml(user.loc)}</div>` : ''}
+            <div class="profile-loc" style="margin-top:2px">🗓️ Member since ${joinDate}</div>
+          </div>
+          <div class="contact-btn-wrap">${contactBtn}</div>
+        </div>
+        <div style="height:48px"></div>
+        <div class="profile-stats">
+          <div class="pstat">
+            <div class="pstat-val" id="upstatPosts">${userTrades.length}</div>
+            <div class="pstat-lbl">Posts</div>
+          </div>
+          <div class="pstat">
+            <div class="pstat-val" id="upstatLikes">${totalLikes}</div>
+            <div class="pstat-lbl">Likes Received</div>
+          </div>
+          <div class="pstat">
+            <div class="pstat-val">100%</div>
+            <div class="pstat-lbl">Trust Score</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User's Trade Posts -->
+      <div class="section-title" style="margin-bottom:18px">${escapeHtml(user.name)}'s Trade Posts</div>
+      <div class="trades-grid" id="userTradesGrid">
+        ${userTrades.length
+          ? [...userTrades].reverse().map(t => tradeCardHTML(t, false)).join('')
+          : `<div class="empty-state">
+               <div class="empty-state-icon">📦</div>
+               <p>${escapeHtml(user.name)} hasn't posted any trades yet.</p>
+             </div>`
+        }
+      </div>
+    `;
+  }
+
+  renderUserProfile();
+</script>
+</body>
+</html>
